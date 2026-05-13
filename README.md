@@ -100,9 +100,3 @@ Training data from AlphaFold_model_PDBs.zip — diverse folds, 26–2000+ residu
 
 ---
 
-## Installation
-
-```bash
-git clone [https://github.com/yoonalimsuwan/SSC-SOC-Controlled-Criticality-](https://github.com/yoonalimsuwan/SSC-SOC-Controlled-Criticality-)
-cd SSC-SOC-Controlled-Criticality-
-pip install -r requirements.txt
