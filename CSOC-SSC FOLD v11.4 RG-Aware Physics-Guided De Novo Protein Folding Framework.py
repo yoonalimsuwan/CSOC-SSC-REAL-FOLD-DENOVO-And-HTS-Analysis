@@ -3,7 +3,6 @@
 # RG-Aware Physics-Guided De Novo Protein Folding Framework
 # -----------------------------------------------------------------------------
 # MIT License — Yoon A Limsuwan 2026
-# github.com/yoonalimsuwan/CSOC-SSC-v11
 # =============================================================================
 
 """
