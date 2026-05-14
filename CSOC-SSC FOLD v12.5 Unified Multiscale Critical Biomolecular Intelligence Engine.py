@@ -1,10 +1,10 @@
 # =============================================================================
-# CSOC-SSC v14.5
+# CSOC-SSC v12.5
 # Unified Multiscale Critical Biomolecular Intelligence Engine
 # =============================================================================
 # MIT License — Yoon A Limsuwan 2026
 #
-# FEATURES (v14.5)
+# FEATURES (v12.5)
 # -----------------------------------------------------------------------------
 # • Adaptive Universality-Class Alpha Fields
 # • SOC / SSC Criticality Dynamics
@@ -60,7 +60,7 @@ warnings.filterwarnings("ignore")
 # METADATA
 # =============================================================================
 
-__version__ = "14.5.0"
+__version__ = "12.5.0"
 __author__ = "Yoon A Limsuwan"
 __license__ = "MIT"
 
@@ -1094,7 +1094,7 @@ def rmsd(a,
 if __name__ == "__main__":
 
     print("\n" + "=" * 80)
-    print("CSOC-SSC v14.5")
+    print("CSOC-SSC v12.5")
     print("Unified Critical Biomolecular Intelligence Engine")
     print("=" * 80)
 
