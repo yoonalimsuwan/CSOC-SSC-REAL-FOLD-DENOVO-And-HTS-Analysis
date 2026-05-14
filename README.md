@@ -100,10 +100,9 @@ Training data from AlphaFold_model_PDBs.zip — diverse folds, 26–2000+ residu
 | Q3 accuracy | 0.0–0.53 | Expected 0.65–0.78 |
 | Contact F1 | 1.000 | Expected ≥ 0.98 |
 
+# CSOC‑SSC — SOC‑Driven Neural‑Physical Protein Folding Engine
 
-# CSOC‑SSC v22 — SOC‑Driven Neural‑Physical Folding Engine
-
-**A trainable hybrid model for protein structure prediction and refinement that combines deep learning, physics‑based energy minimisation, self‑organised criticality (SOC), and renormalisation group (RG) multi‑scale refinement.**
+**A family of de novo protein folding engines that combine deep learning, self‑organised criticality (SOC), differentiable physics, and renormalisation group (RG) refinement. This repository tracks the evolution from the corrected V23 baseline through the distributed V24 to the production‑ready V24.1 – all in a single, MIT‑licensed file.**
 
 *Author*: Yoon A Limsuwan  
 *License*: MIT  
@@ -111,30 +110,126 @@ Training data from AlphaFold_model_PDBs.zip — diverse folds, 26–2000+ residu
 
 ---
 
-## Overview
+## Table of Contents
 
-CSOC‑SSC v22 is a research‑grade protein folding engine that integrates:
+1. [Project Narrative: V23 → V24 → V24.1](#project-narrative-v23--v24--v241)
+2. [Overall Architecture](#overall-architecture)
+3. [Key Features Across All Versions](#key-features-across-all-versions)
+4. [Installation](#installation)
+5. [Quick Start](#quick-start)
+6. [Command‑Line Arguments](#command-line-arguments)
+7. [Physics Energy Terms](#physics-energy-terms)
+8. [SOC Dynamics & Criticality](#soc-dynamics--criticality)
+9. [Renormalisation Group (RG) Refinement](#renormalisation-group-rg-refinement)
+10. [Dataset Format for Training](#dataset-format-for-training)
+11. [Performance Tips](#performance-tips)
+12. [Detailed Version History](#detailed-version-history)
+13. [Citation](#citation)
+14. [License](#license)
+15. [Acknowledgements](#acknowledgements)
 
-- **Neural prediction** – A Transformer encoder‑decoder predicts Cα coordinates from amino‑acid sequence.
-- **Full physics energy** – Bond, angle, Ramachandran, clash, hydrogen bond, electrostatics, solvent, and rotamer terms are all differentiable and modulated by a learned residue‑specific **α‑field**.
-- **Self‑Organised Criticality (SOC)** – An SOC kernel defines interaction topology; an avalanche dynamics redistributes stress through the chain; a CSOC controller adapts temperature based on global structural instability (σ).
-- **Renormalisation Group (RG) refinement** – Differentiable coarse‑graining and upsampling provide multi‑scale regularisation during refinement.
+---
 
-The model can be **trained on protein structure datasets** (e.g., PDB) to learn meaningful latent representations, and then used to **refine predicted or experimental structures** with physically realistic dynamics.
+## Project Narrative: V23 → V24 → V24.1
+
+The CSOC‑SSC project started with the ambitious goal of building a **physically grounded, neural‑guided protein folding system** that could predict a protein’s Cα trace from its amino‑acid sequence alone – a true *de novo* folding engine. Early prototypes (V16–V22) introduced the core ideas: a neural encoder‑decoder, a learned per‑residue α‑field, an SOC interaction kernel, and RG multi‑scale refinement. However, they all suffered from silent bugs, missing physical constants, inconsistent energy scaling, and an SOC component that either crashed or had no influence on the dynamics.
+
+The versions documented here mark the turning point where the code became scientifically rigorous and computationally dependable. They are presented as a continuous lineage, each release fixing the critical flaws of its predecessor while preserving the unique physics‑SOC‑RG philosophy.
+
+### V23 — The Corrected Baseline
+
+V23 was the first version that could run a full refinement cycle without crashing and without producing non‑physical energies. It addressed every known runtime and physics bug:
+
+- **Missing geometry fields** (`ca_ca_dist`, `clash_radius`) were added to the configuration – previously these were referenced in the energy functions but never defined, causing immediate crashes.
+- **Ramachandran energy double‑counting** was removed – the weight `w_rama` was applied both inside the function and again in the total energy aggregator, distorting the energy landscape.
+- **SOC kernel numerical stability** was achieved by clamping distances to a minimum of 1.0 Å and using `exp(-a·log(D))` instead of `D**(-a)`. The kernel was also made batch‑safe by explicitly squeezing the batch dimension when present.
+- **RG refinement** was fixed to safely trim the coordinate array to an exact multiple of the block size before reshaping, preventing silent truncation.
+- **Avalanche stress computation** switched from the unreliable `coords.grad` (which could be `None` after AMP steps) to `torch.autograd.grad(loss, coords)`, guaranteeing a usable gradient signal.
+- **Solvent energy** was vectorised using `torch.where`, eliminating a slow Python loop.
+- **Backbone reconstruction** pre‑allocated a tensor for the O‑atom offset, avoiding repeated allocation inside the loop.
+
+V23 became the rock‑solid foundation for all future work. It was strictly single‑process and used a vanilla Transformer encoder, but its physics were now trustworthy.
+
+### V24 — Distributed & FlashAttention
+
+With a correct physics baseline, V24 scaled the engine to high‑performance computing environments:
+
+- **Multi‑GPU Distributed Data Parallel (DDP)** training was added using PyTorch’s `torch.distributed` and `DistributedSampler`. Training can now be launched with a simple `torchrun` command, and the code automatically handles device assignment, gradient synchronisation, and sampler epoch setting.
+- **FlashAttention** was integrated via PyTorch 2.0’s `torch.backends.cuda.sdp_kernel`, making the Transformer encoder much faster and more memory‑efficient without any change to the architecture.
+- A **PDB fetcher** was included, allowing the engine to download structures directly from the RCSB by ID and use them as initial coordinates or native references for RMSD calculation.
+- **Gradient accumulation** and mixed‑precision (AMP) were fully configured, enabling training with larger effective batch sizes across GPUs.
+
+However, V24 still had two important gaps: the Transformer lacked any positional encoding (making it permutation‑invariant), and the SOC kernel was computed but never fed back into the energy function – it only served as a passive neighbour selector for avalanches. Training therefore struggled because the decoder’s zero‑centred output never matched the un‑centred targets, and the SOC dynamics had no driving force.
+
+### V24.1 — Production‑Ready Release
+
+V24.1 is the definitive, production‑grade version that closes every remaining loop:
+
+- **Sinusoidal positional encoding** was added right after the embedding layer, giving the network true sequence‑order awareness. The encoder is no longer blind to residue position.
+- **Target coordinates are centred** in the dataset and all input coordinates are centred before refinement, aligning with the decoder’s zero‑mean output. Training now converges properly.
+- **SOC kernel energy** is now coupled into the total loss via a weak contact term: *E = –Kᵢⱼ·exp(–rᵢⱼ/8)*. This means the learned α‑field actively shapes the energy landscape through the SOC interaction, and the kernel influences both the energy and the avalanche propagation.
+- **Neural restraint** is computed once at the beginning of refinement and reused, rather than re‑running the entire encoder‑decoder every step. This gives a major speed‑up for long simulations.
+- **Avalanche dynamics** now use `coords.grad` after a standard `loss.backward()` – no more `retain_graph=True` or extra `autograd.grad` calls. The code is simpler and more robust.
+- All the physics corrections from V23 and the distributed training capabilities of V24 are retained.
+
+V24.1 is the engine we recommend for all new work. It is a single, self‑contained Python file, heavily commented, and ready for training on HPC clusters or refinement on a single GPU.
 
 ---
 
-## Key Features
+## Overall Architecture
 
-- **Transformer Encoder** – Sequence to latent representation (6‑layer, 8‑head, dim=256)
-- **Geometry Decoder** – Latent → Cα coordinates (centered, SE(3)‑invariant output)
-- **Adaptive α‑Field** – Learns a residue‑specific exponent (0.5‑3.0) that modulates every physical interaction (bond, angle, Ramachandran width, clash radius, H‑bond geometry)
-- **SOC Interaction Kernel** – Physical kernel: *Kᵢⱼ = rᵢⱼ^(-αᵢⱼ) · exp(-rᵢⱼ / λ)* (no forced normalisation)
-- **CSOC Criticality Controller** – Measures avalanche intensity σ and computes soft‑saturating temperature for Langevin dynamics
-- **Avalanche Dynamics** – High‑stress residues trigger cascaded displacement of neighbours through the SOC kernel
-- **Comprehensive Physics** – Bond, angle, Ramachandran (vectorised), clash, hydrogen bond (angular), Debye‑Hückel electrostatics, implicit solvent, rotamer packing
-- **Differentiable RG** – Block‑averaging coarse‑graining followed by linear interpolation, fully backprop‑friendly
-- **Mixed Precision Training / Refinement** – Automatic Mixed Precision (AMP) for speed and memory efficiency
-- **Single‑file, modular code** – Easy to read, extend, and deploy on HPC or Colab
+The latest V24.1 architecture is summarised below:
+
+```
+
+Sequence → [Embedding + Sinusoidal Positional Encoding]
+↓
+[FlashAttention Encoder (6 layers)]
+↓
+Latent
+/      
+    [Geometry Decoder]   [Adaptive α Field]
+Cα coords            α (per residue)
+
+```
+
+
+
+
+**Refinement loop** (per step):
+1. Build SOC kernel *Kᵢⱼ = rᵢⱼ⁻⁽αᵢ⁺αⱼ⁾/² exp(–rᵢⱼ/λ)*.
+2. Reconstruct backbone atoms (N, C, O) from the Cα trace using idealised peptide geometry.
+3. Compute physical energies: bond, angle, Ramachandran, clash, hydrogen bond, electrostatics, solvation, rotamer packing, SOC contact, and α regularisation.
+4. Optionally add a soft restraint to the neural prediction (computed once before the loop).
+5. Backpropagate to populate `coords.grad`.
+6. Optimiser step (Adam) + Langevin noise (temperature from CSOC).
+7. Every 20 steps: SOC avalanche – residues with gradient stress above threshold push their top‑*k* neighbours through the kernel.
+8. Every 200 steps: differentiable RG block‑averaging and upsampling.
 
 ---
+
+## Key Features Across All Versions
+
+- **De novo folding** from sequence alone, with optional initial structure input.
+- **Learnable α‑field** (0.5–3.0) – a residue‑wise *universality class* that modulates bond lengths, angles, Ramachandran flexibility, clash radius, and H‑bond geometry.
+- **SOC interaction kernel** that couples into the energy and drives avalanche dynamics.
+- **CSOC criticality controller** – soft sigmoidal temperature based on structural instability σ.
+- **Full physics energy stack**: bond, angle, Ramachandran, clash, hydrogen bond (angular), Debye‑Hückel electrostatics, burial‑based implicit solvent, approximate rotamer packing, and SOC contact.
+- **Differentiable RG refinement** via block‑averaging and linear interpolation.
+- **FlashAttention** Transformer encoder (V24+).
+- **Distributed Data Parallel** training with AMP and gradient accumulation (V24+).
+- **PDB fetcher** from RCSB (V24+).
+- **Checkpointing** for both neural predictor and refinement progress.
+- **Single‑file, MIT‑licensed implementation** – easy to read, audit, and extend.
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/yourusername/csoc-ssc.git
+cd csoc-ssc
+pip install torch numpy
+```
+
+Requirements: Python ≥3.8, PyTorch ≥2.0 (CUDA recommended), NumPy. For distributed training, ensure torch.distributed is available (it is included in standard PyTorch distributions).
