@@ -498,11 +498,6 @@ Use at your own discretion.
 
 ---
 
-ด้านล่างคือไฟล์ README.md สำหรับโค้ด CSOC-SSC v16 แบบจัดเต็ม ใช้ภาษาอังกฤษให้เหมาะกับงาน research / GitHub repository พร้อมโครงสร้างมาตรฐาน
-
-
----
-
 # CSOC-SSC v16  
 ### Unified Multiscale Criticality-Guided Biomolecular Folding Engine
 
