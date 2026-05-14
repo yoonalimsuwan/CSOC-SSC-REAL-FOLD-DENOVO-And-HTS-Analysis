@@ -3,7 +3,6 @@
 # Criticality-Constrained RG-Aware De Novo Folding Framework
 # -----------------------------------------------------------------------------
 # MIT License — Yoon A Limsuwan 2026
-# github.com/yoonalimsuwan/CSOC-SSC-v11
 # =============================================================================
 
 """
