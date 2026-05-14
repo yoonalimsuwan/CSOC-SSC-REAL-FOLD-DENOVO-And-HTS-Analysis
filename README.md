@@ -138,10 +138,3 @@ The model can be **trained on protein structure datasets** (e.g., PDB) to learn 
 - **Single‑file, modular code** – Easy to read, extend, and deploy on HPC or Colab
 
 ---
-
-## Installation
-
-```bash
-git clone https://github.com/yourusername/csoc-ssc-v22.git
-cd csoc-ssc-v22
-pip install torch numpy
