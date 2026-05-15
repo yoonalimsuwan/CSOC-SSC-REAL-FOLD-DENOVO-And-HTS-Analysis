@@ -720,7 +720,9 @@ Powered by **Ewald PME** electrostatics, **EGNN + Transformer** deep learning, a
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/csoc-ssc-v30.git
+   git clone https://github.com/yoonalimsuwan/CSOC-SSC-REAL-FOLD-DENOVO-And-HTS-Analysis.git
+
+   
    cd csoc-ssc-v30
 ```
 
