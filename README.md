@@ -601,16 +601,16 @@ Command‑line analysis
 
 ```bash
 # Analyse a single ZIP file (legacy format)
-python hts_fold_v28.py --data Data_tables_for_figs.zip --output ./results
+python CSOC‑SSC HTS FOLD V28 — High‑Throughput Screening Analysis Engine .py --data Data_tables_for_figs.zip --output ./results
 
 # Multiple independent sources (CSV, ZIP, directory)
-python hts_fold_v28.py --data ./screen1.csv ./screen2.zip ./batch3/ --ddg_threshold 0.7
+python CSOC‑SSC HTS FOLD V28 — High‑Throughput Screening Analysis Engine .py --data ./screen1.csv ./screen2.zip ./batch3/ --ddg_threshold 0.7
 
 # Enable GPU acceleration for large datasets
-python hts_fold_v28.py --data ./huge_dataset.csv --gpu
+python CSOC‑SSC HTS FOLD V28 — High‑Throughput Screening Analysis Engine .py --data ./huge_dataset.csv --gpu
 
 # Connect with a CSOC‑SSC refined structure for structure‑based predictions
-python hts_fold_v28.py --data ./mutants.csv --pdb refined_complex_v28.pdb
+python CSOC‑SSC HTS FOLD V28 — High‑Throughput Screening Analysis Engine .py --data ./mutants.csv --pdb refined_complex_v28.pdb
 ```
 
 Python API
